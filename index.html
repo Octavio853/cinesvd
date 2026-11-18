@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CineSVD: un recomendador con PureSVD</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0b;--panel:#151517;--panel2:#1f1f23;--line:#2e2e34;--ink:#f5f5f7;--muted:#9b9ba4;--acc:#e50914}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 Inter,system-ui,sans-serif}
+h1,h2{font-family:'Bebas Neue',Impact,sans-serif;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 20px 40px}
+header h1{font-size:36px}
+header h1 span{color:var(--acc)}
+.pasos{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 16px}
+.paso{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.paso b{display:block;color:var(--acc);font-family:'Bebas Neue',Impact,sans-serif;font-size:18px;margin-bottom:2px}
+.paso span{color:var(--muted);font-size:14px}
+.grid{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:start}
+@media(max-width:860px){.grid,.pasos{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.panel h2{font-size:22px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:9px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.card.on{border-color:var(--acc)}
+.card .t{font-weight:600;font-size:14.5px;line-height:1.25}
+.stars{display:flex;margin-top:auto}
+.stars button{background:none;border:none;color:#3d3d45;font-size:22px;padding:0 1px;cursor:pointer;line-height:1}
+.stars button.on{color:var(--acc)}
+.stars button:hover{color:#ff4d57}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:5px 11px;font:500 13px Inter,sans-serif;cursor:pointer}
+.btn:hover{color:var(--ink)}
+ol{list-style:none;margin:0;padding:0;counter-reset:r}
+li{display:flex;gap:12px;align-items:baseline;padding:9px 4px;border-top:1px solid var(--line)}
+li .n{font-family:'Bebas Neue',Impact,sans-serif;font-size:20px;color:var(--acc);width:24px;text-align:right;flex:none}
+li .t{font-weight:600}
+li .g{color:var(--muted);font-size:13px}
+.vacio{color:var(--muted);text-align:center;padding:40px 10px}
+.pie{color:var(--muted);font-size:13px;margin-top:18px;text-align:center}
+code{background:var(--panel2);padding:1px 5px;border-radius:5px;color:var(--ink)}
+.stars{flex-wrap:wrap}.stars .nv{font:500 12px Inter,sans-serif;color:var(--muted);border:1px solid var(--line);border-radius:7px;padding:3px 7px;flex-basis:100%;margin-top:6px}
+.card.nv{opacity:.55;border-style:dashed}
+.card.nv .nv{color:var(--ink);border-color:var(--muted)}
+.card .estado{font-size:12px;color:var(--muted);min-height:16px}
+.card.on .estado{color:var(--acc)}
+/* recorrido */
+.tour{margin-top:22px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tabs button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:6px 13px;font:500 13.5px Inter,sans-serif;cursor:pointer}
+.tabs button.on{background:var(--acc);border-color:var(--acc);color:#ffffff}
+.tour h3{font-family:'Bebas Neue',Impact,sans-serif;font-size:21px;margin:0 0 4px}
+.tour .exp{color:var(--muted);margin:0 0 14px;max-width:820px}
+.nav{display:flex;justify-content:space-between;margin-top:16px}
+.dims{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
+.mat{border:2px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-direction:column;font-family:'Bebas Neue',Impact,sans-serif;font-size:20px;background:var(--panel2)}
+.mat small{font:12px Inter,sans-serif;color:var(--muted)}
+.mat.hl{border-color:var(--acc);box-shadow:0 0 0 3px rgba(229,9,20,.18)}
+.op{font-size:24px;color:var(--muted)}
+.rcells{display:flex;flex-wrap:wrap;gap:4px}
+.rc{width:66px;border:1px solid var(--line);border-radius:7px;padding:4px;text-align:center;background:var(--panel2)}
+.rc b{display:block;font-family:'Bebas Neue',Impact,sans-serif;font-size:20px}
+.rc span{display:block;font-size:10.5px;color:var(--muted);line-height:1.15;height:24px;overflow:hidden}
+.rc.si{border-color:var(--acc)} .rc.si b{color:var(--acc)}
+.rc.mas{display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);width:130px}
+.heat{display:grid;gap:1px;font-size:12px}
+.heat .lab{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px;display:flex;gap:6px;align-items:center}
+.heat .lab b{color:var(--acc);font-family:'Bebas Neue',Impact,sans-serif}
+.heat i{display:block;height:16px;cursor:pointer}
+.heat i.sel{outline:2px solid #fff}
+.bars{display:flex;align-items:center;gap:2px;height:180px;border-bottom:1px solid var(--line);position:relative}
+.bars .b{flex:1;height:100%;position:relative;cursor:pointer}
+.bars .b i{position:absolute;left:0;right:0;border-radius:2px}
+.bars .b:hover i{filter:brightness(1.3)}
+.bars .b.sel i{outline:2px solid #fff}
+.bars .cero{position:absolute;left:0;right:0;border-top:1px dashed var(--muted);opacity:.5}
+.ejes{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:3px}
+.caja{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:12px;font-size:14px}
+.caja .f{font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.7;color:var(--ink)}
+.caja .f em{color:var(--acc);font-style:normal}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:760px){.dos{grid-template-columns:1fr}}
+.lista{font-size:13.5px} .lista div{padding:3px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px}
+.orden li{cursor:pointer;padding:6px 4px;font-size:14px}
+.orden li.tachada .t{text-decoration:line-through;color:var(--muted)}
+.orden li.sel{background:rgba(229,9,20,.12);border-radius:8px}
+.orden li .sc{margin-left:auto;font-family:ui-monospace,monospace;color:var(--muted);font-size:13px}
+.tag{font-size:11px;border-radius:999px;padding:1px 7px;margin-left:6px}
+.tag.no{background:rgba(224,122,107,.15);color:#e07a6b}.tag.si{background:rgba(124,196,138,.15);color:#7cc48a}
+#recs li{cursor:pointer}
+.card .g{font-size:12px;color:var(--muted);margin-top:-3px}
+.rc{width:96px}.rc em{display:block;font-style:normal;font-size:10px;color:var(--muted);opacity:.85}
+.heat .lab small{color:var(--muted);font-size:10.5px}.heat .lab span{overflow:hidden;text-overflow:ellipsis;line-height:1.15}
+.heat i{height:28px}
+.lista small{color:var(--muted);font-size:11.5px;white-space:nowrap}
+.orden small.g{font-size:11.5px;color:var(--muted);font-weight:400;text-decoration:none;display:inline-block}
+.mates{margin-top:14px;font-size:13px;color:var(--muted)}.mates summary{cursor:pointer}.mates .f{margin-top:6px}
+.tour .exp{font-size:16px;color:#d8d8de}
+
+.etapas{display:flex;align-items:center;gap:10px;margin:4px 0 18px;font-size:14px;color:var(--muted)}
+.etapas span{display:flex;align-items:center;gap:7px;transition:color .4s}
+.etapas b{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);font-size:12.5px;transition:all .4s}
+.etapas span.on{color:var(--ink)}.etapas span.on b{background:var(--acc);border-color:var(--acc);color:#ffffff}
+.etapas i{flex:0 0 60px;height:2px;background:var(--line);position:relative;overflow:hidden}
+.etapas i::after{content:"";position:absolute;inset:0;background:var(--acc);transform:scaleX(var(--prog,0));transform-origin:left;transition:transform .8s}
+.vista{transition:opacity .35s ease,transform .35s ease}
+.vista.oculta{display:none}
+#pasosTop{transition:opacity .35s ease,transform .35s ease}#pasosTop.sale{opacity:0;transform:translateY(-14px);pointer-events:none}
+.vista.sale{opacity:0;transform:translateY(-14px)}
+#vista1 .cards{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.barra{position:sticky;bottom:14px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:rgba(21,21,23,.92);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:14px;padding:12px 16px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.btn.main{background:var(--acc);border-color:var(--acc);color:#ffffff;font-weight:600;font-size:15px;padding:10px 18px}
+.btn.main:disabled{opacity:.35;cursor:not-allowed}
+.btn.main:not(:disabled){animation:late 2.4s infinite}
+@keyframes late{0%,100%{box-shadow:0 0 0 0 rgba(229,9,20,.45)}50%{box-shadow:0 0 0 8px rgba(229,9,20,0)}}
+.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+h2.big{font-size:30px}
+.base{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:13px;color:var(--muted);align-items:center}
+.base span.ch{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:2px 10px;color:var(--ink)}
+.base span.ch b{color:var(--acc)}
+.recgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+@media(max-width:1000px){.recgrid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:620px){.recgrid{grid-template-columns:repeat(2,1fr)}}
+.rcard{position:relative;background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:14px 14px 12px;min-height:150px;display:flex;flex-direction:column;gap:6px;cursor:pointer;overflow:hidden;
+  opacity:0;transform:translateY(22px) scale(.96);animation:entra .55s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(var(--i)*90ms + 80ms)}
+.rcard:hover{border-color:var(--acc)}
+.rcard .rk{font-family:'Bebas Neue',Impact,sans-serif;font-size:44px;line-height:.9;color:var(--acc);opacity:.9}
+.rcard .tt{font-weight:600;font-size:15.5px;line-height:1.25}
+.rcard .yy{color:var(--muted);font-size:12.5px}
+.rcard .gg{display:flex;flex-wrap:wrap;gap:4px;margin-top:auto}
+.rcard .gg span{font-size:11px;background:rgba(229,9,20,.1);color:#ffb8bc;border-radius:999px;padding:1px 7px}
+.rcard.primera{background:linear-gradient(140deg,rgba(229,9,20,.18),var(--panel) 70%);border-color:rgba(229,9,20,.5)}
+
+.rcard .ver{position:absolute;right:12px;top:12px;font-size:11.5px;color:var(--muted);opacity:0;transition:opacity .2s}
+.rcard:hover .ver{opacity:1}
+@keyframes entra{to{opacity:1;transform:none}}
+#vista2 .tour{opacity:0;animation:entra .6s ease forwards;animation-delay:1.1s}
+#trans{position:fixed;inset:0;z-index:20;background:radial-gradient(ellipse at center,#1c0b0d,var(--bg) 70%);display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .35s}
+#trans.on{display:flex}#trans.vis{opacity:1}
+.tbox{width:min(760px,92vw);text-align:center;display:flex;flex-direction:column;align-items:center;gap:18px}
+.fase{font-family:'Bebas Neue',Impact,sans-serif;font-size:28px;min-height:40px;transition:opacity .25s}
+.tchips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;min-height:34px}
+.tchips span{background:var(--panel2);border:1px solid var(--acc);border-radius:999px;padding:5px 12px;font-size:14px;opacity:0;transform:scale(.6);animation:pop .4s cubic-bezier(.3,1.6,.5,1) forwards}
+.tchips span b{color:var(--acc)}
+@keyframes pop{to{opacity:1;transform:none}}
+.tbars{display:flex;gap:3px;height:150px;width:100%;opacity:0;transition:opacity .3s}
+.tbars.vis{opacity:1}
+.tbars div{flex:1;position:relative}
+.tbars i{position:absolute;left:0;right:0;border-radius:2px;transform:scaleY(0);transition:transform .8s cubic-bezier(.2,.8,.2,1)}
+.tbars.crece i{transform:scaleY(1)}
+.tcont{font-family:'Bebas Neue',Impact,sans-serif;font-size:46px;color:var(--acc);min-height:56px}
+.tcont small{display:block;font:14px Inter,sans-serif;color:var(--muted)}
+#saltar{opacity:.6}
+@media (prefers-reduced-motion:reduce){.rcard,#vista2 .tour{animation:none;opacity:1;transform:none}.tbars i{transition:none}}
+
+h1,h2,h3{letter-spacing:.6px;font-weight:400}
+header h1{font-size:46px}
+.panel h2{font-size:28px}
+h2.big{font-size:42px}
+.tour h3{font-size:27px}
+.paso b{font-size:22px;letter-spacing:.5px;font-weight:400}
+.rcard .rk{font-size:58px;line-height:.85}
+.rcard.primera{box-shadow:0 0 0 1px rgba(229,9,20,.6),0 12px 40px rgba(229,9,20,.18)}
+.rcard:hover{transform:translateY(-3px) scale(1.02);transition:transform .2s,border-color .2s}
+.fase{font-size:38px;letter-spacing:1px}
+.tcont{font-size:64px}
+li .n{font-size:24px}
+.stars button.on{text-shadow:0 0 10px rgba(229,9,20,.55)}
+body{background:radial-gradient(ellipse at top,#1a0a0c 0%,#0a0a0b 55%) fixed}
+/* ---- intro ---- */
+#intro{position:fixed;inset:0;z-index:50;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column;overflow:hidden;cursor:pointer;
+  animation:introOut .5s ease 3.4s forwards}
+#intro .logo{font-family:'Bebas Neue',Impact,sans-serif;font-size:clamp(70px,15vw,190px);letter-spacing:6px;color:#e50914;display:flex;
+  text-shadow:0 0 30px rgba(229,9,20,.55),0 0 80px rgba(229,9,20,.35);animation:zoom 1s cubic-bezier(.7,0,.84,0) 2.45s forwards}
+#intro .logo span{display:inline-block;opacity:0;transform:scale(1.9) translateY(-8px);filter:blur(10px);
+  animation:letra .55s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(var(--i)*90ms + .25s)}
+#intro .logo span.w{color:#fff;text-shadow:0 0 30px rgba(255,255,255,.35)}
+#intro .sub{font:500 clamp(13px,1.6vw,17px) Inter,sans-serif;color:#b3b3b8;letter-spacing:4px;text-transform:uppercase;margin-top:8px;opacity:0;
+  animation:subIn .6s ease 1.3s forwards, subOut .3s ease 2.35s forwards}
+#intro .rayos{position:absolute;inset:0;display:flex;justify-content:center;align-items:stretch;gap:1.2vw;opacity:0;animation:rayos 1.2s ease 2.2s forwards;pointer-events:none}
+#intro .rayos i{width:1.4vw;background:linear-gradient(180deg,transparent,var(--c) 30%,var(--c) 70%,transparent);filter:blur(6px);transform:scaleY(0)}
+#intro .barra-luz{position:absolute;bottom:22%;height:2px;width:0;background:linear-gradient(90deg,transparent,#e50914,transparent);animation:luz 1.1s ease .9s forwards}
+#intro .skip{position:absolute;bottom:22px;right:26px;font:12px Inter,sans-serif;color:#66666e;letter-spacing:1px}
+@keyframes letra{to{opacity:1;transform:none;filter:none}}
+@keyframes subIn{to{opacity:1;letter-spacing:6px}}
+@keyframes subOut{to{opacity:0}}
+@keyframes luz{0%{width:0;opacity:1}70%{width:70vw;opacity:1}100%{width:80vw;opacity:0}}
+@keyframes zoom{0%{transform:scale(1)}100%{transform:scale(22);opacity:0}}
+@keyframes rayos{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+#intro .rayos.go i{animation:rayo 1s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(var(--d)*40ms)}
+@keyframes rayo{to{transform:scaleY(1.2)}}
+@keyframes introOut{to{opacity:0;visibility:hidden}}
+#intro.fuera{animation:introOut .35s ease forwards!important}
+@media (prefers-reduced-motion:reduce){#intro{animation:introOut .3s ease .6s forwards}#intro *{animation-duration:.01s!important;animation-delay:0s!important}}
+.orden li .tag{display:inline-block;text-decoration:none}
+.poster{position:relative;border-radius:8px;overflow:hidden;flex:none;
+  background:radial-gradient(circle at var(--hx,78%) var(--hy,18%),rgba(255,255,255,.22),transparent 42%),
+  repeating-linear-gradient(var(--ang),rgba(255,255,255,.045) 0 2px,transparent 2px 10px),
+  linear-gradient(var(--ang),var(--a),var(--b) 72%,#050505)}
+.poster::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.75))}
+.poster .pt{position:absolute;left:10px;right:10px;bottom:8px;z-index:1;font-family:'Bebas Neue',Impact,sans-serif;color:#fff;line-height:.95;letter-spacing:.5px;text-shadow:0 2px 10px rgba(0,0,0,.7)}
+.poster .py{position:absolute;right:9px;top:8px;z-index:1;font:600 11px Inter,sans-serif;color:rgba(255,255,255,.75)}
+.poster .pg{position:absolute;left:9px;top:8px;z-index:1;font:600 9.5px Inter,sans-serif;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.8);background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px}
+.poster.chico{height:118px;margin:-10px -10px 4px;border-radius:10px 10px 0 0}.poster.chico .pt{font-size:24px}
+.card{overflow:hidden}
+.card.nv .poster{filter:grayscale(1)!important}
+.pwrap{position:relative;margin:-14px -14px 6px}
+.poster.alto{aspect-ratio:3/4;border-radius:14px 14px 0 0}.poster.alto .pt{font-size:clamp(22px,2.3vw,30px);bottom:12px;left:auto;right:12px;width:62%;text-align:right}
+.rcard .rk{position:absolute;left:6px;bottom:-6px;z-index:2;font-size:96px;line-height:.8;color:#0a0a0b;-webkit-text-stroke:2px #e50914;opacity:1;text-shadow:none}
+.rcard .es{color:#ffb8bc;font-size:13px;font-style:italic;margin-top:-4px}
+.rcard.primera .rk{-webkit-text-stroke:2px #fff;color:#e50914}
+html{background:#0a0a0b}
+.rcard .rk.dos{font-size:72px;letter-spacing:-4px}
+.calhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.calhead h2{margin:0!important}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--panel2)}
+.seg button{background:none;border:none;color:var(--muted);padding:7px 14px;font:500 13.5px Inter,sans-serif;cursor:pointer}
+.seg button.on{background:var(--acc);color:#fff}
+.rapido{max-width:560px;margin:0 auto}
+.rp-top{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:6px}
+.rp-prog{height:4px;background:var(--line);border-radius:4px;overflow:hidden;margin-bottom:14px}
+.rp-prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .35s}
+.rp-main{display:flex;align-items:center;gap:10px}
+.rnav{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-size:24px;cursor:pointer;line-height:1}
+.rnav:disabled{opacity:.25;cursor:default}
+#rpZona{flex:1;min-width:0;text-align:center;touch-action:pan-y}
+.rp-card{display:flex;gap:16px;align-items:center;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:12px;animation:rpIn .3s ease}
+.rp-card.de-der{animation:rpDer .32s cubic-bezier(.2,.8,.2,1)}.rp-card.de-izq{animation:rpIzq .32s cubic-bezier(.2,.8,.2,1)}
+@keyframes rpDer{from{opacity:0;transform:translateX(50px)}}@keyframes rpIzq{from{opacity:0;transform:translateX(-50px)}}@keyframes rpIn{from{opacity:0;transform:scale(.97)}}
+.poster.rp{width:132px;aspect-ratio:2/3;border-radius:10px}.poster.rp .pt{font-size:22px}
+.rp-t{font-weight:600;font-size:19px;line-height:1.2}
+.rp-es{color:#ffb8bc;font-style:italic;font-size:14px;margin-top:2px}
+.rp-g{color:var(--muted);font-size:13px;margin-top:6px}
+.rp-q{margin:16px 0 8px;color:var(--muted);font-size:14px}
+.rp-stars{display:grid!important;grid-template-columns:repeat(5,1fr);gap:6px}
+.rp-stars button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 2px!important;border:1px solid var(--line)!important;border-radius:12px;background:var(--panel2)!important;color:#3d3d45;transition:transform .12s,background .15s}
+.rp-stars button span{font-size:34px;line-height:1}
+.rp-stars button small{font:500 11.5px Inter,sans-serif;color:var(--muted)}
+.rp-stars button.on{color:var(--acc);border-color:rgba(229,9,20,.6)!important;background:rgba(229,9,20,.08)!important}
+.rp-stars button:active{transform:scale(.94)}
+@media(hover:hover){.rp-stars button:hover{color:#ff4d57}}
+.rp-nv{display:block!important;margin-top:8px}
+.rp-nv .nv{width:100%;padding:11px!important;font-size:14px!important;border-radius:12px!important;margin:0!important}
+.rp-nv .nv.sel{background:var(--muted)!important;color:#0a0a0b!important}
+.rp-atajos{text-align:center;font-size:12px;color:var(--muted);margin-top:12px}
+.rp-fin{padding:26px 10px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.rp-fin .big{font-family:'Bebas Neue',Impact,sans-serif;font-size:56px;color:var(--acc)}
+/* ---------- celular ---------- */
+@media(hover:none){.rp-atajos{display:none}.rcard .ver{display:none}}
+@media(max-width:640px){
+  .wrap{padding:16px 12px 120px}
+  header h1{font-size:32px;line-height:1}
+  .etapas{font-size:12.5px;margin-bottom:12px}.etapas i{flex-basis:30px}
+  .pasos{display:none}
+  .panel{padding:14px;border-radius:12px}
+  .panel h2{font-size:24px}
+  #vista1 .cards{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+  .poster.chico{height:96px}.poster.chico .pt{font-size:19px}
+  .card .t{font-size:13.5px}
+  .stars button{font-size:24px}
+  .barra{position:fixed;left:10px;right:10px;bottom:10px;flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px;z-index:5}
+  .barra #cuenta{font-size:13px;text-align:center}
+  .barra .btn.main{width:100%}
+  .rnav{display:none}
+  .poster.rp{width:104px}
+  .rp-t{font-size:17px}
+  .rp-stars{gap:4px}.rp-stars button span{font-size:28px}.rp-stars button small{font-size:10px}
+  h2.big{font-size:34px}
+  .hero{flex-direction:column;align-items:stretch}
+  .recgrid{grid-template-columns:repeat(2,1fr)!important;gap:10px}
+  .rcard{padding:10px}.pwrap{margin:-10px -10px 6px}
+  .rcard .rk{font-size:70px}.rcard .rk.dos{font-size:56px}
+  .rcard .tt{font-size:14px}.rcard .gg span{font-size:10px}
+  .poster.alto .pt{font-size:20px}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+  .tabs button{flex:none}
+  .tour .exp{font-size:15px}
+  .dims{gap:6px}.dims .mat{width:auto!important;min-width:58px;padding:8px 6px;font-size:15px;height:auto!important;min-height:44px}
+  .dims .op{font-size:18px}
+  .heat{--labw:96px}.heat .lab{font-size:11px}.heat i{height:24px}
+  .bars{height:140px}
+  .rc{width:calc(33.3% - 3px)}
+  .orden li .sc{display:none}
+  #intro .sub{letter-spacing:2px;font-size:11px;text-align:center;padding:0 20px}
+  .fase{font-size:28px}.tcont{font-size:48px}
+}
+.h1s{font-size:inherit}.h1s span{color:inherit!important}.h1s .mu{display:none}
+@media(max-width:640px){
+  .h1s{display:block;font:500 15px Inter,sans-serif;color:var(--muted);margin-top:4px}
+  .h1s .dp{display:none}.h1s .mu{display:inline!important}
+  h2.big{font-size:30px}
+  .poster.alto .pt{font-size:17px;width:58%}
+  .poster.rp .pt{font-size:17px}
+  .calhead{flex-direction:column;align-items:stretch}
+  .calhead .row{justify-content:space-between}
+  .seg button{padding:7px 11px;font-size:13px;white-space:nowrap}
+  #borrar{white-space:nowrap;font-size:12px}
+}
+</style>
+</head>
+<body>
+<div id="intro" title="Tocá para saltar">
+  <div class="rayos" id="rayos"></div>
+  <div class="logo" id="logo"></div>
+  <div class="sub">Un recomendador con PureSVD</div>
+  <div class="barra-luz"></div>
+  <span class="skip">Tocá para saltar</span>
+</div>
+<div class="wrap">
+<header>
+  <h1>Cine<span>SVD</span><small class="h1s"><span class="dp">: u</span><span class="mu">U</span>n recomendador con PureSVD</small></h1>
+</header>
+
+<div class="etapas"><span id="e1" class="on"><b>1</b> Calificá</span><i></i><span id="e2"><b>2</b> Tus recomendaciones</span></div>
+
+<div id="vista1" class="vista">
+  <div class="pasos" id="pasosTop">
+    <div class="paso"><b>1. Tus notas</b><span>Lo que califiques forma tu fila <code>r</code>: tu nota en cada película y 0 en las que no viste.</span></div>
+    <div class="paso"><b>2. 50 gustos ocultos</b><span>La SVD de 1 millón de calificaciones encontró 50 direcciones principales. Tu fila se proyecta sobre ellas: <code>r V</code>.</span></div>
+    <div class="paso"><b>3. Puntaje</b><span>Volvemos al espacio de películas, <code>r V Vᵀ</code>, y recomendamos las 10 de mayor puntaje que todavía no viste.</span></div>
+  </div>
+  <section class="panel">
+    <div class="calhead"><h2>Calificá las que viste</h2>
+      <div class="row" style="display:flex;gap:8px;align-items:center"><div class="seg" id="modoCal"><button data-m="rapido" class="on">Una por una</button><button data-m="grilla">Ver todas</button></div>
+      <button class="btn" id="borrar">Empezar de nuevo</button></div></div>
+    <div class="rapido" id="rapido">
+      <div class="rp-top"><span id="rpTxt"></span><span id="rpHechas"></span></div>
+      <div class="rp-prog"><i id="rpBar"></i></div>
+      <div class="rp-main"><button class="rnav" id="rpAnt" title="Anterior">‹</button><div id="rpZona"></div><button class="rnav" id="rpSig" title="Siguiente">›</button></div>
+      <div class="rp-atajos">Atajos: teclas 1 a 5 para puntuar · N = no la vi · ← → para moverte · Enter para ver recomendaciones</div>
+    </div>
+    <div class="cards" id="cards" style="display:none"></div>
+  </section>
+  <div class="barra">
+    <span id="cuenta">Calificá al menos una película para empezar.</span>
+    <button class="btn main" id="ver" disabled>Ver mis recomendaciones →</button>
+  </div>
+</div>
+
+<div id="vista2" class="vista oculta">
+  <div class="hero">
+    <div>
+      <h2 class="big">Tus 10 recomendaciones</h2>
+      <div class="base" id="base"></div>
+    </div>
+    <button class="btn" id="volver">← Cambiar mis notas</button>
+  </div>
+  <div class="recgrid" id="recs"></div>
+  <section class="panel tour" id="tour">
+    <h2>Paso a paso: de matriz en matriz</h2>
+    <div class="tabs" id="tabs"></div>
+    <div id="paso"></div>
+    <div class="nav"><button class="btn" id="ant">← Anterior</button><button class="btn" id="sig">Siguiente →</button></div>
+  </section>
+</div>
+<p class="pie">MovieLens 1M · 6.040 usuarios, 3.706 películas · PureSVD con d = 50<br><span style="font-size:12px">Datos: MovieLens 1M, GroupLens Research, Universidad de Minnesota (F. M. Harper y J. A. Konstan, 2015). Trabajo final de Análisis Matricial.</span></p>
+</div>
+
+<div id="trans"><div class="tbox">
+  <div class="fase" id="fase">Leyendo tus notas…</div>
+  <div class="tchips" id="tchips"></div>
+  <div class="tbars" id="tbars"></div>
+  <div class="tcont" id="tcont"></div>
+  <button class="btn" id="saltar">Saltar</button>
+</div></div>
+<script>
+const GEN={"Action":"Acción","Adventure":"Aventura","Animation":"Animación","Children's":"Infantil","Comedy":"Comedia","Crime":"Policial","Documentary":"Documental","Drama":"Drama","Fantasy":"Fantasía","Film-Noir":"Cine negro","Horror":"Terror","Musical":"Musical","Mystery":"Misterio","Romance":"Romance","Sci-Fi":"Ciencia ficción","Thriller":"Suspenso","War":"Bélica","Western":"Western"};
+let n,K,V,T,G,ELEG=null,notas=new Map(),noVistas=new Set();
+let E=null, paso=0, selK=0, selJ=null;
+const $=s=>document.querySelector(s);
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=(x,d=3)=>x.toLocaleString("es-AR",{minimumFractionDigits:d,maximumFractionDigits:d});
+const N=n=>n.toLocaleString("es-AR");
+function titulo(t,anio=true){let m=t.match(/^(.*) \((\d{4})\)$/),x=m?m[1]:t;
+  const a=x.match(/^(.*), (The|A|An|La|Le|Les|El|Il)$/);if(a)x=a[2]+" "+a[1];return x+(m&&anio?` (${m[2]})`:"");}
+const ES={"2651":"Belleza americana","253":"La guerra de las galaxias","1106":"El imperio contraataca","1120":"El regreso del Jedi","466":"Parque Jurásico","1848":"Rescatando al soldado Ryan","575":"Terminator 2: El juicio final","1178":"Volver al futuro","579":"El silencio de los inocentes","1449":"Hombres de negro","1108":"Los cazadores del arca perdida","2557":"Sexto sentido","106":"Corazón valiente","2203":"Shakespeare apasionado","1107":"La princesa prometida","513":"La lista de Schindler","1485":"Los Ángeles al desnudo","1173":"Hechizo del tiempo","1025":"E.T., el extraterrestre","2426":"La amenaza fantasma","2785":"¿Quieres ser John Malkovich?","309":"Sueños de libertad","802":"El padrino","2511":"Los cazafantasmas","287":"Tiempos violentos","1148":"El exterminador","0":"Toy Story: Juguetes","1124":"Alien, el octavo pasajero","2708":"El vengador del futuro","443":"El fugitivo","3341":"Gladiador","1110":"Aliens: El regreso","2775":"¿Quién engañó a Roger Rabbit?","1167":"Cuenta conmigo","49":"Los sospechosos de siempre","33":"Babe, el chanchito valiente","2586":"¿Y dónde está el piloto?","737":"Día de la independencia","2958":"Héroes fuera de órbita","1104":"Atrapado sin salida","858":"El mago de Oz","863":"2001: Odisea del espacio","1050":"El secreto del abismo","2162":"Bichos: una aventura en miniatura","1288":"Tiburón","1131":"El padrino II","971":"Duro de matar","1123":"Buenos muchachos","1478":"La caza al Octubre Rojo","367":"Máxima velocidad","1199":"Indiana Jones y la última cruzada","1820":"Arma mortal","1059":"Monty Python y el Santo Grial","2898":"Toy Story 2: Los juguetes vuelven a la carga","1215":"Cuando Harry conoció a Sally","1563":"En busca del destino","1788":"El club de los cinco","627":"Misión: Imposible","31":"12 monos","1993":"Beetlejuice: El súper fantasma","2592":"Quisiera ser grande","2099":"El joven manos de tijera","2710":"Todo en un día","576":"Danza con lobos","2748":"El club de la pelea","3238":"Encuentros cercanos del tercer tipo","1275":"Star Trek II: La ira de Khan","1295":"Educando a Arizona","2480":"Austin Powers: El espía seductor","1618":"Mejor... imposible","1445":"Contracara","1212":"Dos hombres y un destino","3186":"Thelma y Louise","370":"Mentiras verdaderas","2501":"American Pie: Tu primera vez","1453":"Contacto","1406":"El quinto elemento","3248":"Alta fidelidad","1743":"Loco por Mary","713":"Dr. Insólito","2494":"Aracnofobia","2599":"Una historia de Navidad","574":"Aladdín","2213":"Tras la esmeralda perdida","1130":"Los hermanos caradura","699":"La roca","1139":"Dos extraños amantes","2959":"El talentoso Sr. Ripley","1781":"Cuando los hermanos se encuentran","3508":"Pollitos en fuga","1007":"Un pez llamado Wanda","847":"Intriga internacional","3177":"Erin Brockovich: una mujer audaz","1003":"Willy Wonka y la fábrica de chocolate","3383":"Misión: Imposible 2","1258":"Star Trek: Primer contacto","3294":"Depredador","1129":"Psicosis","1155":"El graduado","1017":"Perros de la calle","1420":"El mundo perdido: Jurassic Park","1132":"Nacido para matar","3510":"El patriota","2505":"El proyecto Blair Witch","347":"Cuatro bodas y un funeral","1022":"El juego de las lágrimas","1116":"La naranja mecánica","2931":"Milagros inesperados","1398":"Austin Powers: Agente internacional del misterio","1504":"Todo o nada","1186":"El joven Frankenstein","1160":"Barrio chino","357":"La máscara","1118":"Apocalipsis ahora","1539":"Invasión","2334":"El planeta de los simios","1831":"Volver al futuro II","2128":"Amor a colores","859":"Lo que el viento se llevó","2131":"La vida es bella","1832":"Volver al futuro III","46":"Pecados capitales","1271":"Duro de matar 2","1536":"Juegos de placer","1934":"Indiana Jones y el templo de la perdición","2013":"Los intocables","1277":"Star Trek IV: Misión: salvar la Tierra","573":"Ghost: La sombra del amor","354":"El rey león","3029":"El mundo de Wayne","307":"Stargate: La puerta del tiempo","862":"El ciudadano","1150":"Tiempos de gloria","702":"Tornado","1584":"El gran Lebowski","2558":"El caso Thomas Crown","1166":"El resplandor","2110":"Mi primo Vinny","3216":"Buenos días, Vietnam","1516":"Gattaca: experimento genético","1476":"Avión presidencial","1292":"¡Marcianos al ataque!","2488":"Corre, Lola, corre","2262":"La mosca","2865":"La leyenda del jinete sin cabeza","2078":"Cuestión de honor","581":"La bella y la bestia","339":"Peligro inminente","908":"La reina africana","3032":"Juego de patriotas","843":"La ventana indiscreta","1143":"El golpe","583":"Mujer bonita","1873":"Querida, encogí a los niños","852":"El halcón maltés","1900":"La sirenita","3461":"Mad Max 2: El guerrero de la carretera","1278":"Batman vuelve","2683":"Tres reyes","3512":"La tormenta perfecta","1821":"Arma mortal 2","1029":"Top Gun: Pasión y gloria","2757":"Los bandidos del tiempo","2415":"La momia","1545":"The Truman Show: Historia de una vida","1142":"El submarino","1273":"Star Trek VI: Aquel país desconocido","1174":"Los imperdonables","537":"El extraño mundo de Jack","1729":"Expedientes secretos X","3651":"Casi famosos","319":"Star Trek: Generaciones","1094":"El paciente inglés","2160":"Enemigo público","525":"Sintonía de amor","1826":"La máscara del Zorro","2857":"Hechizo de luna","24":"Adiós a Las Vegas","2097":"El juego de Hollywood","1306":"El último de los mohicanos","460":"En la línea de fuego","1502":"Persiguiendo a Amy","426":"Presidente por un día","745":"El profesor chiflado","1125":"El ejército de las tinieblas","2507":"Ojos bien cerrados","2892":"Pescador de ilusiones","1190":"Fantasía","5":"Fuego contra fuego","1158":"El puente sobre el río Kwai","2541":"La tiendita de los horrores","1184":"La leyenda del indomable","35":"Mientras estés conmigo","1117":"Matar a un ruiseñor","1276":"Star Trek III: En busca de Spock","1008":"La vida de Brian","284":"El perfecto asesino","68":"Del crepúsculo al amanecer","2277":"Cocodrilo Dundee","1613":"La mejor de mis bodas","1732":"Un romance peligroso","842":"Vértigo","2819":"S.O.S., hay un loco suelto en el espacio","1696":"Impacto profundo","1727":"Mulán","2483":"Tarzán","2102":"Hormiguitas","580":"Blancanieves y los siete enanos","1439":"Hércules","740":"El jorobado de Notre Dame","1897":"El libro de la selva","957":"La Cenicienta","1915":"La bella durmiente","582":"Pinocho","1899":"La dama y el vagabundo","639":"James y el durazno gigante","2556":"El gigante de hierro","2201":"El príncipe de Egipto","2191":"Babe 2: El chanchito en la ciudad","2941":"Stuart Little: Un ratón en la familia","1817":"El exorcista","1249":"Pesadilla","1904":"La noche de las narices frías","967":"Alicia en el país de las maravillas","960":"La espada en la piedra","601":"Los aristogatos","968":"El zorro y el sabueso","1909":"Bernardo y Bianca","561":"Los pequeños traviesos","2161":"Rugrats: La película","572":"Mi pobre angelito","970":"La novicia rebelde","1825":"Los Goonies","1016":"Baile caliente","1281":"Grease: Brillantina","2469":"Un lugar llamado Notting Hill","2519":"Novia fugitiva","2231":"Tienes un e-mail","486":"Papá por siempre","1371":"Mentiroso, mentiroso","334":"Ace Ventura: Un detective diferente","224":"Tonto y retonto","1305":"Scream: Grita antes de morir","1802":"Noche de brujas","1843":"El padrino III","16":"Sensatez y sentimientos","1154":"La sociedad de los poetas muertos","3228":"El señor de las moscas","2374":"Matrix"};
+const corto0=j=>titulo(T[j],false);
+const corto=j=>corto0(j)+(ES[j]?` (${ES[j]})`:"");
+const anioDe=j=>(T[j].match(/\((\d{4})\)$/)||[,""])[1];
+const GCOL={"Action":["#c0161f","#2a0406"],"Adventure":["#c2601a","#2a1204"],"Animation":["#e0457b","#2b0718"],"Children's":["#1fa39a","#04201e"],"Comedy":["#e0a321","#2b1d03"],"Crime":["#5b5b6e","#0d0d12"],"Documentary":["#4f8a4a","#0b1a0a"],"Drama":["#7c3fb0","#170a24"],"Fantasy":["#9b4fd1","#1a0a2a"],"Film-Noir":["#6b6b6b","#050505"],"Horror":["#8f0000","#0a0000"],"Musical":["#d0479b","#26061a"],"Mystery":["#2f5f9e","#060f1f"],"Romance":["#d6336c","#2a0612"],"Sci-Fi":["#1b7fc4","#03142a"],"Thriller":["#3b5670","#060c14"],"War":["#6d7a35","#12150a"],"Western":["#a8692e","#1f1005"]};
+const PAL10=[["#e50914","#3a0306"],["#1b7fc4","#03142a"],["#e0a321","#2b1d03"],["#1fa39a","#04201e"],["#8e44d6","#170a24"],["#e0457b","#2b0718"],["#d9661c","#2a1204"],["#4f9a48","#0b1a0a"],["#3e6fd1","#060f1f"],["#b8862f","#1f1005"]];
+function poster(j,cls="",rango=null){const gs=G[j].split("|");let a=GCOL[gs[0]]||["#555","#111"],b=GCOL[gs[1]]||a;const ang=135+(j*37)%70;
+  if(rango!==null){a=PAL10[rango%10];b=PAL10[(rango+4)%10];}
+  return `<div class="poster ${cls}" style="--a:${a[0]};--b:${b[1]};--ang:${ang}deg;--hx:${20+(j*53)%60}%;--hy:${10+(j*29)%35}%;filter:hue-rotate(${rango!==null?0:((j*7)%5-2)*9}deg)"><span class="pg">${esc(GEN[gs[0]]||gs[0])}</span><span class="py">${anioDe(j)}</span><span class="pt">${esc(corto0(j))}</span></div>`;}
+const gen1=j=>GEN[G[j].split("|")[0]]||G[j].split("|")[0];
+const gen=j=>G[j].split("|").map(g=>GEN[g]||g).join(", ");
+const v=(j,k)=>V[j*K+k];
+function color(x,max){const t=Math.max(-1,Math.min(1,x/max)),a=Math.abs(t);
+  return t>=0?`rgba(229,9,20,${.08+.92*a})`:`rgba(78,168,255,${.08+.92*a})`;}
+
+fetch("modelo.json").then(r=>r.json()).then(js=>{
+  n=js.n;K=js.K;T=js.titulos;G=js.generos;ELEG=js.elegidas;
+  const bin=atob(js.q);V=new Float32Array(bin.length);
+  for(let i=0;i<bin.length;i++){let b=bin.charCodeAt(i);if(b>127)b-=256;V[i]=b*js.s[i%K];}
+  $("#cards").innerHTML=ELEG.map(j=>`<div class="card" id="c${j}">${poster(j,"chico")}<div class="t">${esc(corto(j))}</div>
+    <div class="g">${anioDe(j)} · ${esc(gen(j))}</div>
+    <div class="estado"></div>
+    <div class="stars" data-j="${j}">${[1,2,3,4,5].map(k=>`<button data-r="${k}">★</button>`).join("")}<button class="nv" data-r="0">No la vi</button></div></div>`).join("");
+  recomendar();renderRapido();
+});
+
+document.addEventListener("click",e=>{
+  const b=e.target.closest(".stars button");if(!b)return;
+  const j=+b.parentElement.dataset.j,r=+b.dataset.r;
+  if(r===0){ if(noVistas.has(j))noVistas.delete(j); else {noVistas.add(j);notas.delete(j);} }
+  else { noVistas.delete(j); if(notas.get(j)===r)notas.delete(j); else notas.set(j,r); }
+  pintar(j);selJ=null;recomendar();if(modoCal==="rapido")renderRapido();
+});
+$("#borrar").onclick=()=>{const v=[...notas.keys(),...noVistas];notas.clear();noVistas.clear();v.forEach(pintar);selJ=null;recomendar();rpI=0;renderRapido();};
+
+function pintar(j){const r=notas.get(j)||0,c=$("#c"+j),nv=noVistas.has(j);
+  c.classList.toggle("on",r>0);c.classList.toggle("nv",nv);
+  c.querySelectorAll("button[data-r]").forEach(x=>{const k=+x.dataset.r;if(k)x.classList.toggle("on",k<=r);});
+  c.querySelector(".estado").textContent=nv?"No la vi → queda en 0":r?`La viste: ${r}★`:"";}
+
+function recomendar(){
+  if(!notas.size){E=null;
+    actualizarBarra();renderPaso();return;}
+  const p=new Float64Array(K);
+  for(const [j,r] of notas)for(let k=0;k<K;k++)p[k]+=r*v(j,k);
+  const sc=new Float64Array(n);
+  for(let j=0;j<n;j++){let s=0;for(let k=0;k<K;k++)s+=v(j,k)*p[k];sc[j]=s;}
+  const orden=[...Array(n).keys()].sort((a,b)=>sc[b]-sc[a]||a-b);
+  const top=orden.filter(j=>!notas.has(j)).slice(0,10);
+  E={p,sc,orden,top};
+  if(selJ===null||!top.includes(selJ))selJ=top[0];
+  pintarRecs();
+  renderPaso();
+}
+$("#recs").addEventListener("click",e=>{const li=e.target.closest("[data-j]");if(!li)return;
+  selJ=+li.dataset.j;paso=4;renderPaso();$("#tour").scrollIntoView({behavior:"smooth"});});
+
+
+/* ---------------- Vistas y transición ---------------- */
+const sinMov=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const espera=ms=>new Promise(r=>setTimeout(r,sinMov?Math.min(ms,60):ms));
+let saltar=false;
+
+function actualizarBarra(){
+  const c=notas.size;
+  $("#ver").disabled=c===0;
+  $("#cuenta").innerHTML=c?`Calificaste <b>${c}</b> película${c>1?"s":""}${noVistas.size?` · ${noVistas.size} sin ver`:""}. ${c<3?"Con 2 o 3 notas ya funciona bien.":"¡Listo para recomendarte!"}`:"Calificá al menos una película para empezar.";
+}
+function pintarRecs(){
+  actualizarBarra();
+  if(!E)return;
+  const anio=j=>(T[j].match(/\((\d{4})\)$/)||[,""])[1];
+  $("#recs").innerHTML=E.top.map((j,i)=>`<div class="rcard ${i===0?"primera":""}" data-j="${j}" style="--i:${i}">
+    <span class="ver">ver el cálculo ↓</span>
+    <div class="pwrap">${poster(j,"alto",i)}<div class="rk ${i>=9?"dos":""}">${i+1}</div></div><div class="tt">${esc(corto0(j))}</div>${ES[j]?`<div class="es">(${esc(ES[j])})</div>`:""}<div class="yy">${anio(j)}</div>
+    <div class="gg">${G[j].split("|").map(g=>`<span>${GEN[g]||g}</span>`).join("")}</div></div>`).join("");
+  $("#base").innerHTML="Basadas en: "+[...notas].sort((a,b)=>b[1]-a[1]).map(([j,r])=>`<span class="ch">${esc(corto0(j))} <b>${"★".repeat(r)}</b></span>`).join("");
+}
+
+async function irARecs(){
+  if(!E)return;
+  saltar=false;
+  const v1=$("#vista1"),tr=$("#trans");
+  v1.classList.add("sale");
+  await espera(350);
+  // preparar la animación con los números reales
+  $("#tchips").innerHTML="";$("#tcont").innerHTML="";
+  const max=Math.max(...E.p.map(Math.abs))||1;
+  $("#tbars").className="tbars";
+  $("#tbars").innerHTML=[...E.p].map(x=>{const h=48*Math.abs(x)/max;
+    return `<div><i style="${x>=0?`bottom:50%;height:${h}%;transform-origin:bottom`:`top:50%;height:${h}%;transform-origin:top`};background:${x>=0?"var(--acc)":"#4ea8ff"}"></i></div>`;}).join("");
+  tr.classList.add("on");await espera(20);tr.classList.add("vis");
+  const fase=t=>{$("#fase").textContent=t;};
+  // fase 1: tus notas
+  fase("Leyendo tus notas…");
+  for(const [j,r] of notas){if(saltar)break;$("#tchips").insertAdjacentHTML("beforeend",`<span>${esc(corto0(j))} <b>${r}★</b></span>`);await espera(Math.min(220,900/notas.size));}
+  if(!saltar)await espera(450);
+  // fase 2: perfil de gustos
+  if(!saltar){fase("Armando tu perfil de 50 gustos…");$("#tbars").classList.add("vis");await espera(60);$("#tbars").classList.add("crece");await espera(1100);}
+  // fase 3: comparar con todas
+  if(!saltar){fase("Comparando con todas las películas…");
+    const t0=performance.now(),dur=sinMov?0:900;
+    while(!saltar){const f=Math.min(1,(performance.now()-t0)/(dur||1));
+      $("#tcont").innerHTML=`${N(Math.round(f*n))}<small>películas puntuadas</small>`;if(f>=1)break;await new Promise(r=>requestAnimationFrame(r));}
+    if(!saltar)await espera(350);}
+  // mostrar recomendaciones
+  v1.classList.add("oculta");v1.classList.remove("sale");
+  const v2=$("#vista2");v2.classList.remove("oculta");
+  pintarRecs();paso=0;selK=0;renderPaso();
+  const tour=$("#vista2 .tour");tour.style.animation="none";tour.offsetHeight;tour.style.animation="";
+  $("#e2").classList.add("on");document.querySelector(".etapas").style.setProperty("--prog",1);
+  scrollTo({top:0});
+  tr.classList.remove("vis");await espera(350);tr.classList.remove("on");
+}
+async function volverACalificar(){
+  const v2=$("#vista2"),v1=$("#vista1");
+  v2.classList.add("sale");await espera(350);
+  v2.classList.add("oculta");v2.classList.remove("sale");
+  v1.classList.remove("oculta");v1.classList.add("sale");await espera(20);v1.classList.remove("sale");
+  $("#e2").classList.remove("on");document.querySelector(".etapas").style.setProperty("--prog",0);
+  scrollTo({top:0,behavior:"smooth"});
+}
+$("#ver").onclick=irARecs;
+$("#volver").onclick=volverACalificar;
+$("#saltar").onclick=()=>{saltar=true;};
+
+
+/* ---------------- Intro ---------------- */
+(()=>{const it=$("#intro");
+  $("#logo").innerHTML=[..."CINESVD"].map((c,i)=>`<span class="${i>=4?"":"w"}" style="--i:${i}">${c}</span>`).join("");
+  const cols=["#e50914","#ff4d57","#b20710","#ff8a8f","#e50914","#7a0b10"];
+  $("#rayos").innerHTML=Array.from({length:22},(_,i)=>`<i style="--c:${cols[i%cols.length]};--d:${Math.abs(i-11)}"></i>`).join("");
+  setTimeout(()=>{const r=$("#rayos");if(r)r.classList.add("go");},2200);
+  const fin=()=>{it.classList.add("fuera");setTimeout(()=>it.remove(),400);};
+  it.addEventListener("click",fin);
+  it.addEventListener("animationend",e=>{if(e.target===it)it.remove();});
+})();
+
+
+/* ---------------- Modo "una por una" ---------------- */
+let modoCal="rapido",rpI=0;
+const ETQ=["","Mala","Regular","Buena","Muy buena","¡Excelente!"];
+function setModo(m){modoCal=m;
+  [...$("#modoCal").children].forEach(b=>b.classList.toggle("on",b.dataset.m===m));
+  $("#rapido").style.display=m==="rapido"?"":"none";$("#cards").style.display=m==="rapido"?"none":"";
+  if(m==="rapido")renderRapido();}
+$("#modoCal").onclick=e=>{const b=e.target.closest("button");if(b)setModo(b.dataset.m);};
+
+function renderRapido(dir=0){
+  if(!ELEG)return;
+  const tot=ELEG.length,hechas=ELEG.filter(j=>notas.has(j)||noVistas.has(j)).length;
+  $("#rpTxt").textContent=`${Math.min(rpI+1,tot)} de ${tot}`;
+  $("#rpHechas").textContent=`${hechas} respondida${hechas===1?"":"s"}`;
+  $("#rpBar").style.width=(100*hechas/tot)+"%";
+  $("#rpAnt").disabled=rpI===0;
+  if(rpI>=tot){
+    $("#rpZona").innerHTML=`<div class="rp-fin"><div class="big">¡Listo!</div><p>Calificaste <b>${notas.size}</b> película${notas.size===1?"":"s"}.</p>
+      <button class="btn main" onclick="irARecs()" ${notas.size?"":"disabled"}>Ver mis recomendaciones →</button>
+      <button class="btn" onclick="rpI=0;renderRapido()">Revisar desde el principio</button></div>`;
+    $("#rpSig").disabled=true;return;}
+  $("#rpSig").disabled=false;
+  const j=ELEG[rpI],r=notas.get(j)||0,nv=noVistas.has(j);
+  $("#rpZona").innerHTML=`<div class="rp-card ${dir>0?"de-der":dir<0?"de-izq":""}">
+      ${poster(j,"rp")}
+      <div class="rp-info"><div class="rp-t">${esc(corto0(j))}</div>${ES[j]?`<div class="rp-es">(${esc(ES[j])})</div>`:""}
+      <div class="rp-g">${anioDe(j)} · ${esc(gen(j))}</div></div></div>
+    <div class="rp-q">¿Qué tal te pareció?</div>
+    <div class="stars rp-stars" data-j="${j}">${[1,2,3,4,5].map(k=>`<button data-r="${k}" class="${k<=r?"on":""}"><span>★</span><small>${ETQ[k]}</small></button>`).join("")}</div>
+    <div class="stars rp-nv" data-j="${j}"><button data-r="0" class="nv ${nv?"sel":""}">No la vi</button></div>`;
+}
+function rpMover(d){const tot=ELEG.length;const n2=Math.max(0,Math.min(tot,rpI+d));if(n2!==rpI){rpI=n2;renderRapido(d);}}
+$("#rpAnt").onclick=()=>rpMover(-1);
+$("#rpSig").onclick=()=>rpMover(1);
+// al responder, avanza solo
+$("#rapido").addEventListener("click",e=>{const b=e.target.closest(".stars button");if(!b)return;
+  const j=+b.parentElement.dataset.j;
+  setTimeout(()=>{ if(notas.has(j)||noVistas.has(j)) rpMover(1); else renderRapido(); },260);});
+// deslizar con el dedo
+let tx=null;
+$("#rpZona").addEventListener("touchstart",e=>{tx=e.touches[0].clientX;},{passive:true});
+$("#rpZona").addEventListener("touchend",e=>{if(tx===null)return;const dx=e.changedTouches[0].clientX-tx;tx=null;
+  if(Math.abs(dx)>60)rpMover(dx<0?1:-1);},{passive:true});
+// teclado
+document.addEventListener("keydown",e=>{
+  if($("#vista1").classList.contains("oculta")||modoCal!=="rapido"||e.target.tagName==="INPUT")return;
+  const j=ELEG&&ELEG[rpI];
+  if(e.key>="1"&&e.key<="5"&&j!==undefined){$(`#rpZona .rp-stars button[data-r="${e.key}"]`).click();}
+  else if((e.key==="n"||e.key==="N"||e.key==="0")&&j!==undefined){$("#rpZona .rp-nv button").click();}
+  else if(e.key==="ArrowRight")rpMover(1);
+  else if(e.key==="ArrowLeft")rpMover(-1);
+  else if(e.key==="Enter"&&notas.size)irARecs();
+});
+
+/* ---------------- Recorrido ---------------- */
+const PASOS=["1 · La gran tabla de notas","2 · Tus notas","3 · El perfil de cada película","4 · Tu perfil de gustos","5 · Puntaje y top 10"];
+$("#tabs").innerHTML=PASOS.map((t,i)=>`<button data-i="${i}">${t}</button>`).join("");
+$("#tabs").onclick=e=>{const b=e.target.closest("button");if(b){paso=+b.dataset.i;renderPaso();}};
+$("#ant").onclick=()=>{paso=Math.max(0,paso-1);renderPaso();};
+$("#sig").onclick=()=>{paso=Math.min(PASOS.length-1,paso+1);renderPaso();};
+$("#paso").addEventListener("click",e=>{
+  const k=e.target.closest("[data-k]"),j=e.target.closest("[data-sj]");
+  if(k){e.preventDefault();selK=+k.dataset.k;if(k.tagName==="A")paso=3;renderPaso();} else if(j){selJ=+j.dataset.sj;renderPaso();}
+});
+
+const falta='<div class="caja">Calificá al menos una película arriba para ver este paso con tus propios números.</div>';
+const mates=t=>`<details class="mates"><summary>Para los que saben de matrices</summary><div class="f">${t}</div></details>`;
+const ejeG='<div class="ejes"><span>gusto 1</span><span>gusto 50</span></div>';
+
+function renderPaso(){
+  [...$("#tabs").children].forEach((b,i)=>b.classList.toggle("on",i===paso));
+  $("#ant").style.visibility=paso?"visible":"hidden";
+  $("#sig").style.visibility=paso<PASOS.length-1?"visible":"hidden";
+  $("#paso").innerHTML=[paso1,paso2,paso3,paso4,paso5][paso]();
+}
+function caja(nombre,dims,w,h,hl){return `<div class="mat ${hl?"hl":""}" style="width:${w}px;height:${h}px">${nombre}<small>${dims}</small></div>`;}
+
+function paso1(){
+  return `<h3>La gran tabla de notas</h3>
+  <p class="exp">Imaginá una planilla gigante: <b>6.040 personas</b> en las filas y <b>3.706 películas</b> en las columnas. En cada casilla está la nota que esa persona le puso a esa película. Como nadie vio todo, casi toda la planilla está vacía (solo el 4,5 % tiene nota). Las casillas vacías se llenan con 0.</p>
+  <p class="exp">El método busca <b>patrones</b>: si a mucha gente que le gustó <i>Toy Story</i> también le gustó <i>Aladdin</i>, esas dos películas "se parecen". Así encuentra <b>50 gustos de fondo</b> que explican casi toda la planilla. Nadie le dice cuáles son: los descubre solo, mirando qué películas le gustan a la misma gente.</p>
+  <div class="dims">
+    ${caja("Planilla","6.040 personas × 3.706 películas",230,140)}<span class="op">≈</span>
+    ${caja("Personas","× 50 gustos",90,140)}<span class="op">·</span>
+    ${caja("Peso","de cada gusto",90,70)}<span class="op">·</span>
+    ${caja("Películas","× 50 gustos",230,70,true)}
+  </div>
+  <div class="caja">Para recomendar solo usamos la parte resaltada: <b>el perfil de cada película</b>, es decir, cuánto tiene de cada uno de los 50 gustos. Vos sos alguien nuevo que no está en la planilla, así que no hace falta recalcular nada: comparamos tu perfil con el de cada película.</div>
+  ${mates("A (6.040 × 3.706) ≈ U Σ Vᵀ, SVD truncada con d = 50.<br>Para un usuario nuevo con fila r: puntajes <em>s = r V Vᵀ</em> (PureSVD).")}`;
+}
+
+function paso2(){
+  const celdas=ELEG.map(j=>{const r=notas.get(j)||0,nv=noVistas.has(j);
+    return `<div class="rc ${r?"si":""}" title="${esc(corto(j))} · ${esc(gen(j))}"><b>${r}</b><span>${esc(corto0(j))}</span><em>${esc(gen1(j))}</em>${nv?'<em style="color:#e07a6b">no la vi</em>':""}</div>`;}).join("");
+  return `<h3>Tus notas</h3>
+  <p class="exp">Lo que calificaste arriba es tu fila en la planilla: un número por película. Las que no viste valen <b>0</b>, igual que las miles de películas que ni aparecen en la lista. Para el sistema, "no la vi" significa simplemente "no tengo información".</p>
+  <div class="rcells">${celdas}<div class="rc mas">… y ${N(n-ELEG.length)} películas más, todas en 0</div></div>
+  <div class="caja">Calificaste <b>${notas.size}</b> película${notas.size===1?"":"s"}. Solo esas van a influir en tus recomendaciones.</div>
+  ${mates("r ∈ ℝ<sup>1×3.706</sup>, con r<sub>j</sub> = tu nota si viste la película j y r<sub>j</sub> = 0 si no.")}`;
+}
+
+function paso3(){
+  if(!E)return `<h3>El perfil de cada película</h3>`+falta;
+  const js=[...notas.keys()];let max=0;js.forEach(j=>{for(let k=0;k<K;k++)max=Math.max(max,Math.abs(v(j,k)));});
+  const filas=js.map(j=>`<div class="lab"><b>${notas.get(j)}★</b><span>${esc(corto(j))}<br><small>${esc(gen(j))}</small></span></div>`+
+    [...Array(K).keys()].map(k=>`<i data-k="${k}" class="${k===selK?"sel":""}" style="background:${color(v(j,k),max)}" title="${esc(corto(j))}, gusto ${k+1}: ${fmt(v(j,k))}"></i>`).join("")).join("");
+  return `<h3>El perfil de cada película</h3>
+  <p class="exp">Cada película tiene un <b>perfil de 50 gustos</b>: una fila de 50 números. <span style="color:var(--acc)">Rojo</span> quiere decir que la película tiene mucho de ese gusto y <span style="color:#4ea8ff">azul</span> que tiene lo contrario. Acá están los perfiles de las películas que calificaste: películas parecidas tienen colores parecidos. Tocá una columna para ver qué representa ese gusto.</p>
+  <div class="heat" style="grid-template-columns:var(--labw,minmax(130px,220px)) repeat(${K},1fr)">${filas}</div>
+  <div class="ejes" style="margin-left:min(220px,30%)"><span>gusto 1</span><span>gusto 50</span></div>
+  ${mates("Son las filas de V (3.706 × 50) correspondientes a las películas con r<sub>j</sub> ≠ 0. Las demás filas se multiplican por 0 en r V.")}`;
+}
+
+function paso4(){
+  if(!E)return `<h3>Tu perfil de gustos</h3>`+falta;
+  const p=E.p,max=Math.max(...p.map(Math.abs))||1,k=selK;
+  const barras=[...p].map((x,i)=>{const hgt=45*Math.abs(x)/max;
+    return `<div class="b ${i===k?"sel":""}" data-k="${i}" title="gusto ${i+1}: ${fmt(x)}"><i style="${x>=0?`bottom:50%;height:${hgt}%`:`top:50%;height:${hgt}%`};background:${x>=0?"var(--acc)":"#4ea8ff"}"></i></div>`;}).join("");
+  const terminos=[...notas].map(([j,r])=>`${r}★ × <em>${fmt(v(j,k))}</em> <span style="color:var(--muted)">(${esc(corto0(j))})</span>`).join("<br>+ ");
+  const ord=[...Array(n).keys()].sort((a,b)=>v(b,k)-v(a,k));
+  const fila=j=>`<div><span>${esc(corto(j))}</span><small>${esc(gen1(j))}</small></div>`;
+  return `<h3>Tu perfil de gustos</h3>
+  <p class="exp">Juntamos los perfiles de las películas que calificaste, <b>pesando cada uno por tu nota</b>: una película de 5★ cuenta más que una de 2★. El resultado es <b>tu propio perfil de 50 gustos</b>. Las barras altas son los gustos que más te representan. Tocá una barra para ver la cuenta y qué películas tienen ese gusto.</p>
+  <div class="bars"><div class="cero" style="top:50%"></div>${barras}</div>${ejeG}
+  <div class="dos">
+    <div class="caja"><b>Tu valor en el gusto ${k+1}</b>
+      <div class="f">${terminos}<br>= <em>${fmt(p[k])}</em></div>
+      <div style="color:var(--muted);font-size:12.5px;margin-top:6px">Tu nota multiplicada por cuánto tiene cada película de este gusto, todo sumado.</div></div>
+    <div class="caja"><b>¿Qué es el gusto ${k+1}?</b>
+      <div class="dos" style="margin-top:6px">
+        <div class="lista"><span style="color:var(--acc)">Películas con mucho de este gusto</span>${ord.slice(0,6).map(fila).join("")}</div>
+        <div class="lista"><span style="color:#4ea8ff">${k===0?"Películas con casi nada":"Películas con lo contrario"}</span>${ord.slice(-6).reverse().map(fila).join("")}</div>
+      </div>
+      <div style="color:var(--muted);font-size:12.5px;margin-top:6px">${k===0?"El gusto 1 es casi \"popularidad\": tienen mucho de él las películas que vio mucha gente.":"Los gustos no tienen nombre: los interpretamos mirando qué películas quedan juntas."}</div></div>
+  </div>
+  ${mates("p = r V ∈ ℝ<sup>1×50</sup>, es decir, p<sub>k</sub> = Σ<sub>j</sub> r<sub>j</sub> V<sub>jk</sub>. Son las coordenadas de tu fila en la base de los primeros 50 vectores singulares derechos.")}`;
+}
+
+function paso5(){
+  if(!E)return `<h3>Puntaje y top 10</h3>`+falta;
+  const {p,sc,orden,top}=E,j=selJ;
+  const lista=[];let cuenta=0;
+  for(const x of orden){lista.push(x);if(!notas.has(x))cuenta++;if(cuenta>=10)break;}
+  const items=lista.map(x=>{const vista=notas.has(x),pos=top.indexOf(x);
+    return `<li data-sj="${x}" class="${vista?"tachada":""} ${x===j?"sel":""}"><span class="n">${vista?"✕":pos+1}</span><span class="t">${esc(corto(x))}${vista?'<span class="tag no">ya la calificaste</span>':'<span class="tag si">recomendada</span>'}<br><small class="g">${esc(gen(x))}</small></span><span class="sc">${fmt(sc[x],2)}</span></li>`;}).join("");
+  const prod=[...Array(K).keys()].map(k=>p[k]*v(j,k)),max=Math.max(...prod.map(Math.abs))||1;
+  const barras=prod.map((x,i)=>{const hgt=45*Math.abs(x)/max;
+    return `<div class="b" data-k="${i}" title="gusto ${i+1}: suma ${fmt(x,3)}"><i style="${x>=0?`bottom:50%;height:${hgt}%`:`top:50%;height:${hgt}%`};background:${x>=0?"var(--acc)":"#4ea8ff"}"></i></div>`;}).join("");
+  const mejores=[...Array(K).keys()].sort((a,b)=>prod[b]-prod[a]).slice(0,3);
+  return `<h3>Puntaje y top 10</h3>
+  <p class="exp">Para cada una de las 3.706 películas comparamos <b>su perfil con el tuyo</b>, gusto por gusto: si los dos tienen mucho del mismo gusto, suma; si son opuestos, resta. Eso da un <b>puntaje</b>. Ordenamos todas de mayor a menor, <b>sacamos las que ya calificaste</b>, y las 10 primeras son tus recomendaciones. Tocá una película para ver de dónde sale su puntaje.</p>
+  <div class="dos">
+    <div><ol class="orden">${items}</ol></div>
+    <div class="caja" style="margin-top:0"><b>${esc(corto(j))}</b> <small class="g">${esc(gen(j))}</small>
+      <div style="margin:6px 0">Puntaje: <b style="color:var(--acc)">${fmt(sc[j],2)}</b></div>
+      <div style="font-size:12.5px;color:var(--muted);margin:6px 0">Cuánto suma cada gusto (rojo suma, azul resta):</div>
+      <div class="bars" style="height:120px"><div class="cero" style="top:50%"></div>${barras}</div>${ejeG}
+      <div style="margin-top:8px;font-size:13.5px">Te la recomendamos sobre todo por los gustos ${mejores.map(k=>`<a href="#" data-k="${k}" style="color:var(--acc)">${k+1}</a>`).join(", ")}: en esos gustos, vos y esta película coinciden. Tocá un número para ver qué gusto es.</div>
+    </div>
+  </div>
+  ${mates("s = p Vᵀ = r V Vᵀ ∈ ℝ<sup>1×3.706</sup>; s<sub>j</sub> = Σ<sub>k</sub> p<sub>k</sub> V<sub>jk</sub> (producto escalar). Top-10 = los 10 mayores s<sub>j</sub> con r<sub>j</sub> = 0, empates por índice.")}`;
+}
+</script>
+</body>
+</html>
